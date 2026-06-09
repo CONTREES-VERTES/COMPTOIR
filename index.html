@@ -1022,39 +1022,64 @@ async function loadHiboutikData() {
       fetchHiboutik('/categories/'),
       fetchHiboutik('/suppliers/'),
     ]);
+    console.log(`API: ${products.length} products, ${cats.length} categories, ${sups.length} suppliers`);
 
-    if (cats.length > 0) console.log('=== RAW CATEGORY ===', JSON.stringify(cats[0]));
-    if (sups.length > 0) console.log('=== RAW SUPPLIER ===', JSON.stringify(sups[0]));
+    if (cats.length > 0) console.log('RAW category[0]:', cats[0]);
+    if (sups.length > 0) console.log('RAW supplier[0]:', sups[0]);
 
     APP.categories = {};
-    cats.forEach(c => {
-      const id  = c.categories_id  || c.category_id  || c.id;
-      const nm  = c.categories_name || c.category_name || c.name || '';
+    cats.forEach(ct => {
+      const id = ct.category_id || ct.categories_id || ct.id;
+      const nm = ct.category_name || ct.categories_name || ct.name || '';
       APP.categories[id] = nm;
     });
     APP.suppliers = {};
     sups.forEach(s => {
-      const id  = s.suppliers_id  || s.supplier_id  || s.id;
-      const nm  = s.suppliers_name || s.supplier_name || s.name || '';
+      const id = s.supplier_id || s.suppliers_id || s.id;
+      const nm = s.supplier_name || s.suppliers_name || s.company || s.name || '';
       APP.suppliers[id] = nm;
     });
 
-    // Log raw first product to detect field names
+    // Fetch stock levels and alerts separately
+    let stockData = [], alertData = [], vatData = [];
+    try { stockData  = await fetchHiboutik('/stock/'); } catch(e) { console.warn('stock endpoint failed', e); }
+    try { alertData  = await fetchHiboutik('/stock_alert/'); } catch(e) { console.warn('stock_alert failed', e); }
+    try { vatData    = await fetchHiboutik('/vat/'); } catch(e) { console.warn('vat endpoint failed', e); }
+
+    // Build lookup maps
+    const stockMap = {};
+    stockData.forEach(s => {
+      const id = s.product_id || s.products_id;
+      stockMap[id] = (stockMap[id] || 0) + (parseInt(s.stock_available || s.quantity || s.stock || 0));
+    });
+    const alertMap = {};
+    alertData.forEach(a => {
+      const id = a.product_id || a.products_id;
+      alertMap[id] = parseInt(a.stock_limit || a.alert_stock || a.stock_min || 0);
+    });
+    const vatMap = {};
+    vatData.forEach(v => { vatMap[v.vat_id || v.id] = parseFloat(v.vat_rate || v.rate || 0); });
+
+    // Log first product for debugging
     if (products.length > 0) {
-      console.log('=== HIBOUTIK RAW PRODUCT FIELDS ===', JSON.stringify(products[0], null, 2));
       APP._rawSample = products[0];
+      console.log('RAW product[0]:', products[0]);
+      console.log('stockMap sample:', Object.entries(stockMap).slice(0,3));
+      console.log('alertMap sample:', Object.entries(alertMap).slice(0,3));
     }
 
     APP.products = products.map(p => {
-      // Support multiple field name variants from Hiboutik API
-      const id    = p.products_id   || p.product_id   || p.id || '';
-      const name  = p.products_name || p.product_model || p.product_name || p.name || '';
-      const catId = p.categories_id || p.product_category || p.category_id || '';
-      const supId = p.suppliers_id  || p.product_supplier || p.supplier_id || '';
-      const stock = parseInt(p.stock_available || p.stock || p.quantity || 0);
-      const smin  = parseInt(p.stock_alert || p.stock_min || p.alert_stock || 0);
-      const pa    = parseFloat(p.products_price || p.product_price || p.price || 0);
-      const pv    = parseFloat(p.products_price_ttc || p.product_price_ttc || p.price_ttc || pa);
+      const id    = p.product_id   || p.products_id || '';
+      const name  = p.product_model || p.products_name || p.product_name || '';
+      const catId = p.product_category || p.categories_id || '';
+      const supId = p.product_supplier || p.suppliers_id || '';
+      const vatId = p.product_vat || 0;
+      const vatRate = vatMap[vatId] || 0;
+      const pa    = parseFloat(p.product_supply_price || p.product_price || 0);
+      const pvHT  = parseFloat(p.product_price || 0);
+      const pv    = pvHT > 0 ? parseFloat((pvHT * (1 + vatRate / 100)).toFixed(2)) : 0;
+      const stock = stockMap[id] !== undefined ? stockMap[id] : 0;
+      const smin  = alertMap[id] !== undefined ? alertMap[id] : 0;
       return {
         products_id: id,
         products_name: name,
@@ -1063,7 +1088,7 @@ async function loadHiboutikData() {
         suppliers_id: supId,
         suppliers_name: APP.suppliers[supId] || '',
         products_price: pa,
-        products_price_ttc: pv,
+        products_price_ttc: pv || pvHT,
         stock_available: stock,
         stock_min: smin,
         is_dv: false,
