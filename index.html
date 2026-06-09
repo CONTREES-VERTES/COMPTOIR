@@ -998,8 +998,12 @@ function buildDemoData() {
 // ── HIBOUTIK API ──
 async function fetchHiboutik(endpoint) {
   const base = `https://${APP.account}.hiboutik.com/api`;
-  const headers = { 'Authorization': 'Basic ' + btoa(`${APP.email}:${APP.apikey}`), 'Content-Type': 'application/json' };
-  const res = await fetch(base + endpoint, { headers });
+  const headers = {
+    'Authorization': 'Basic ' + btoa(`${APP.email}:${APP.apikey}`),
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+  };
+  const res = await fetch(base + endpoint, { method: 'GET', headers, mode: 'cors' });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
@@ -1123,8 +1127,24 @@ async function connectHiboutik() {
     APP.connected = true;
     afterConnect();
   } catch(e) {
-    err.style.display = 'block';
-    err.textContent = 'Impossible de se connecter à Hiboutik. Vérifiez votre compte, email et clé API.';
+    btn.disabled = false; btn.textContent = 'Connexion';
+    // Detect CORS vs other errors
+    const isCors = e.message && (e.message.includes('fetch') || e.message.includes('Failed') || e.message.includes('NetworkError') || e.message.includes('CORS'));
+    if (isCors || e instanceof TypeError) {
+      err.style.display = 'block';
+      err.innerHTML = `
+        <strong>Erreur CORS - connexion bloquée par le navigateur</strong><br><br>
+        GitHub Pages ne peut pas appeler l'API Hiboutik directement pour des raisons de sécurité.<br><br>
+        <strong>Solutions :</strong><br>
+        1. <strong>Extension Chrome "CORS Unblock"</strong> : installez-la, activez-la, rechargez la page.<br>
+        2. <strong>Mode démonstration</strong> : effacez les champs et cliquez Connexion pour tester l'app avec les données exemples.<br><br>
+        <a href="https://chrome.google.com/webstore/detail/cors-unblock/lfhmikememgdcahcdlaciloancbhjino" target="_blank" style="color:var(--red);font-weight:bold">→ Installer CORS Unblock pour Chrome</a>
+      `;
+    } else {
+      err.style.display = 'block';
+      err.textContent = 'Impossible de se connecter à Hiboutik. Vérifiez votre compte, email et clé API. (' + (e.message||'erreur inconnue') + ')';
+    }
+    return;
   }
   btn.disabled = false; btn.textContent = 'Connexion';
 }
