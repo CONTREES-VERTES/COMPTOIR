@@ -530,10 +530,14 @@
 
     <!-- DASHBOARD -->
     <div id="screen-dashboard" class="screen">
-      <div class="page-top">
-        <div class="page-title">Tableau de bord</div>
-        <div class="page-sub" id="dash-date">Chargement...</div>
+      <div class="page-top" style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+          <div class="page-title">Tableau de bord</div>
+          <div class="page-sub" id="dash-date">Chargement...</div>
+        </div>
+        <button class="btn-sm btn-out" onclick="showRawDebug()" id="btn-debug" style="font-size:11px;opacity:.6">🔍 Debug API</button>
       </div>
+      <div id="debug-panel" style="display:none;background:#1a1a2e;color:#00ff88;padding:12px 16px;border-radius:8px;font-family:monospace;font-size:11px;margin-bottom:16px;white-space:pre-wrap;max-height:200px;overflow:auto"></div>
       <div class="kpi-grid" id="kpi-grid">
         <div class="kpi-card tc">
           <div class="kpi-label">Articles en stock</div>
@@ -1019,23 +1023,45 @@ async function loadHiboutikData() {
       fetchHiboutik('/suppliers/'),
     ]);
 
+    if (cats.length > 0) console.log('=== RAW CATEGORY ===', JSON.stringify(cats[0]));
+    if (sups.length > 0) console.log('=== RAW SUPPLIER ===', JSON.stringify(sups[0]));
+
     APP.categories = {};
-    cats.forEach(c => APP.categories[c.categories_id] = c.categories_name);
+    cats.forEach(c => {
+      const id  = c.categories_id  || c.category_id  || c.id;
+      const nm  = c.categories_name || c.category_name || c.name || '';
+      APP.categories[id] = nm;
+    });
     APP.suppliers = {};
-    sups.forEach(s => APP.suppliers[s.suppliers_id] = s.suppliers_name);
+    sups.forEach(s => {
+      const id  = s.suppliers_id  || s.supplier_id  || s.id;
+      const nm  = s.suppliers_name || s.supplier_name || s.name || '';
+      APP.suppliers[id] = nm;
+    });
+
+    // Log raw first product to detect field names
+    if (products.length > 0) {
+      console.log('=== HIBOUTIK RAW PRODUCT FIELDS ===', JSON.stringify(products[0], null, 2));
+      APP._rawSample = products[0];
+    }
 
     APP.products = products.map(p => {
-      const stock = parseInt(p.stock_available) || 0;
-      const smin  = parseInt(p.stock_alert) || 0;
-      const pa    = parseFloat(p.products_price) || 0;
-      const pv    = parseFloat(p.products_price_ttc) || 0;
+      // Support multiple field name variants from Hiboutik API
+      const id    = p.products_id   || p.product_id   || p.id || '';
+      const name  = p.products_name || p.product_model || p.product_name || p.name || '';
+      const catId = p.categories_id || p.product_category || p.category_id || '';
+      const supId = p.suppliers_id  || p.product_supplier || p.supplier_id || '';
+      const stock = parseInt(p.stock_available || p.stock || p.quantity || 0);
+      const smin  = parseInt(p.stock_alert || p.stock_min || p.alert_stock || 0);
+      const pa    = parseFloat(p.products_price || p.product_price || p.price || 0);
+      const pv    = parseFloat(p.products_price_ttc || p.product_price_ttc || p.price_ttc || pa);
       return {
-        products_id: p.products_id,
-        products_name: p.products_name,
-        categories_id: p.categories_id,
-        categories_name: APP.categories[p.categories_id] || '',
-        suppliers_id: p.suppliers_id,
-        suppliers_name: APP.suppliers[p.suppliers_id] || '',
+        products_id: id,
+        products_name: name,
+        categories_id: catId,
+        categories_name: APP.categories[catId] || '',
+        suppliers_id: supId,
+        suppliers_name: APP.suppliers[supId] || '',
         products_price: pa,
         products_price_ttc: pv,
         stock_available: stock,
@@ -1044,6 +1070,7 @@ async function loadHiboutikData() {
         statut: stock === 0 ? 'RUPTURE' : (stock <= smin ? 'ALERTE' : 'OK'),
         marge: pv > 0 ? Math.round((pv - pa) / pv * 100) : 0,
         valeur_stock: pa * stock,
+        _raw: p,
       };
     });
 
@@ -1190,6 +1217,31 @@ function populateFilters() {
     sel.innerHTML = '<option value="">Toutes catégories</option>';
     cats.forEach(c => sel.innerHTML += `<option value="${c}">${c}</option>`);
   });
+}
+
+// ═══════════════════════════════════════════════════════════
+// DEBUG
+// ═══════════════════════════════════════════════════════════
+
+function showRawDebug() {
+  const panel = document.getElementById('debug-panel');
+  if (panel.style.display !== 'none') { panel.style.display = 'none'; return; }
+  const sample = APP._rawSample || (APP.products[0] && APP.products[0]._raw) || APP.products[0] || 'Aucune donnée';
+  panel.style.display = 'block';
+  panel.textContent = '=== PREMIER PRODUIT BRUT API ===\n' + JSON.stringify(sample, null, 2)
+    + '\n\n=== PRODUIT MAPPÉ ===\n' + JSON.stringify(APP.products[0], null, 2);
+}
+
+// ═══════════════════════════════════════════════════════════
+// DEBUG
+// ═══════════════════════════════════════════════════════════
+
+function showRawDebug() {
+  const panel = document.getElementById("debug-panel");
+  if (panel.style.display !== "none") { panel.style.display = "none"; return; }
+  const sample = APP._rawSample || (APP.products[0] && APP.products[0]._raw) || APP.products[0] || "Aucune donnee";
+  panel.style.display = "block";
+  panel.textContent = "=== PREMIER PRODUIT BRUT API ===\n" + JSON.stringify(sample, null, 2) + "\n\n=== PRODUIT MAPPE ===\n" + JSON.stringify({...APP.products[0], _raw: undefined}, null, 2);
 }
 
 // ═══════════════════════════════════════════════════════════
