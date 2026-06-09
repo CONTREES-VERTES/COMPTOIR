@@ -1040,32 +1040,61 @@ async function loadHiboutikData() {
       APP.suppliers[id] = nm;
     });
 
-    // Fetch stock levels and alerts separately
-    let stockData = [], alertData = [], vatData = [];
-    try { stockData  = await fetchHiboutik('/stock/'); } catch(e) { console.warn('stock endpoint failed', e); }
-    try { alertData  = await fetchHiboutik('/stock_alert/'); } catch(e) { console.warn('stock_alert failed', e); }
-    try { vatData    = await fetchHiboutik('/vat/'); } catch(e) { console.warn('vat endpoint failed', e); }
-
-    // Build lookup maps
-    const stockMap = {};
-    stockData.forEach(s => {
-      const id = s.product_id || s.products_id;
-      stockMap[id] = (stockMap[id] || 0) + (parseInt(s.stock_available || s.quantity || s.stock || 0));
-    });
-    const alertMap = {};
-    alertData.forEach(a => {
-      const id = a.product_id || a.products_id;
-      alertMap[id] = parseInt(a.stock_limit || a.alert_stock || a.stock_min || 0);
-    });
+    // Fetch VAT rates
+    let vatData = [];
+    try { vatData = await fetchHiboutik('/vat/'); } catch(e) { console.warn('vat failed', e); }
     const vatMap = {};
     vatData.forEach(v => { vatMap[v.vat_id || v.id] = parseFloat(v.vat_rate || v.rate || 0); });
 
-    // Log first product for debugging
+    // Try multiple stock endpoints (Hiboutik uses warehouse-scoped stock)
+    const stockMap = {}, alertMap = {};
+    let stockRaw = [], stockEndpointUsed = '';
+
+    // Try endpoints in order of likelihood
+    const stockEndpoints = [
+      '/stock_available/warehouse_id/1',
+      '/stock_available/warehouse_id/0',
+      '/stock_available/',
+      '/stock/',
+    ];
+    for (const ep of stockEndpoints) {
+      try {
+        stockRaw = await fetchHiboutik(ep);
+        if (Array.isArray(stockRaw) && stockRaw.length > 0) {
+          stockEndpointUsed = ep;
+          console.log(`Stock endpoint OK: ${ep}, ${stockRaw.length} records, sample:`, stockRaw[0]);
+          break;
+        }
+      } catch(e) { console.warn(`Stock endpoint ${ep} failed:`, e.message); }
+    }
+
+    stockRaw.forEach(s => {
+      const id  = s.product_id || s.products_id || s.id;
+      const qty = parseInt(s.stock_available || s.quantity || s.stock || s.available || 0);
+      stockMap[id] = (stockMap[id] || 0) + qty;
+    });
+
+    // Try stock alert endpoints
+    let alertRaw = [];
+    for (const ep of ['/stock_alert/', '/stock_limit/']) {
+      try {
+        alertRaw = await fetchHiboutik(ep);
+        if (Array.isArray(alertRaw) && alertRaw.length > 0) {
+          console.log(`Alert endpoint OK: ${ep}, sample:`, alertRaw[0]);
+          break;
+        }
+      } catch(e) { console.warn(`Alert endpoint ${ep} failed:`, e.message); }
+    }
+    alertRaw.forEach(a => {
+      const id = a.product_id || a.products_id || a.id;
+      alertMap[id] = parseInt(a.stock_limit || a.alert_stock || a.stock_min || a.limit || 0);
+    });
+
+    // Log for debugging
     if (products.length > 0) {
       APP._rawSample = products[0];
-      console.log('RAW product[0]:', products[0]);
-      console.log('stockMap sample:', Object.entries(stockMap).slice(0,3));
-      console.log('alertMap sample:', Object.entries(alertMap).slice(0,3));
+      APP._debug = { stockEndpointUsed, stockMapSize: Object.keys(stockMap).length, alertMapSize: Object.keys(alertMap).length, stockSample: Object.entries(stockMap).slice(0,5), vatSample: Object.entries(vatMap).slice(0,3) };
+      console.log('DEBUG:', APP._debug);
     }
 
     APP.products = products.map(p => {
@@ -1251,10 +1280,12 @@ function populateFilters() {
 function showRawDebug() {
   const panel = document.getElementById('debug-panel');
   if (panel.style.display !== 'none') { panel.style.display = 'none'; return; }
-  const sample = APP._rawSample || (APP.products[0] && APP.products[0]._raw) || APP.products[0] || 'Aucune donnée';
+  const p0 = APP.products.find(p => (p.stock_available||0) > 0) || APP.products[0];
   panel.style.display = 'block';
-  panel.textContent = '=== PREMIER PRODUIT BRUT API ===\n' + JSON.stringify(sample, null, 2)
-    + '\n\n=== PRODUIT MAPPÉ ===\n' + JSON.stringify(APP.products[0], null, 2);
+  panel.textContent =
+    '=== INFOS STOCK API ===\n' + JSON.stringify(APP._debug || 'non disponible', null, 2) +
+    '\n\n=== PRODUIT BRUT (1er avec stock > 0) ===\n' + JSON.stringify(APP._rawSample, null, 2) +
+    '\n\n=== PRODUIT MAPPÉ ===\n' + JSON.stringify(p0 ? {...p0, _raw: undefined} : 'aucun', null, 2);
 }
 
 // ═══════════════════════════════════════════════════════════
