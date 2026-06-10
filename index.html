@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Gestion Stock Boutique - Contrées Vertes</title>
+<title>Gestion Stock Boutique - Contrées Vertes v3</title>
 <style>
   :root {
     --tc:  #D88050;
@@ -1040,11 +1040,13 @@ async function loadHiboutikData() {
       APP.suppliers[id] = nm;
     });
 
-    // Fetch VAT rates
-    let vatData = [];
-    try { vatData = await fetchHiboutik('/vat/'); } catch(e) { console.warn('vat failed', e); }
-    const vatMap = {};
-    vatData.forEach(v => { vatMap[v.vat_id || v.id] = parseFloat(v.vat_rate || v.rate || 0); });
+    // Standard French VAT rates by Hiboutik vat_id
+    const vatMap = { 0: 0, 1: 20, 2: 10, 3: 5.5, 4: 2.1, 5: 8.5 };
+    // Try to fetch actual VAT config (may 404 on some accounts)
+    try {
+      const vatData = await fetchHiboutik('/vat/');
+      if (Array.isArray(vatData)) vatData.forEach(v => { vatMap[v.vat_id||v.id] = parseFloat(v.vat_rate||v.rate||0); });
+    } catch(e) { console.log('Using default French VAT rates'); }
 
     // Try multiple stock endpoints (Hiboutik uses warehouse-scoped stock)
     const stockMap = {}, alertMap = {};
@@ -1068,27 +1070,18 @@ async function loadHiboutikData() {
       } catch(e) { console.warn(`Stock endpoint ${ep} failed:`, e.message); }
     }
 
+    if (stockRaw.length > 0) console.log('Stock record sample:', JSON.stringify(stockRaw[0]));
     stockRaw.forEach(s => {
       const id  = s.product_id || s.products_id || s.id;
-      const qty = parseInt(s.stock_available || s.quantity || s.stock || s.available || 0);
-      stockMap[id] = (stockMap[id] || 0) + qty;
+      const qty = parseInt(s.stock_available ?? s.quantity ?? s.stock ?? s.available ?? 0);
+      if (!isNaN(qty)) stockMap[id] = (stockMap[id] || 0) + qty;
     });
+    console.log('stockMap built:', Object.keys(stockMap).length, 'entries, sample:', Object.entries(stockMap).slice(0,5));
 
-    // Try stock alert endpoints
-    let alertRaw = [];
-    for (const ep of ['/stock_alert/', '/stock_limit/']) {
-      try {
-        alertRaw = await fetchHiboutik(ep);
-        if (Array.isArray(alertRaw) && alertRaw.length > 0) {
-          console.log(`Alert endpoint OK: ${ep}, sample:`, alertRaw[0]);
-          break;
-        }
-      } catch(e) { console.warn(`Alert endpoint ${ep} failed:`, e.message); }
-    }
-    alertRaw.forEach(a => {
-      const id = a.product_id || a.products_id || a.id;
-      alertMap[id] = parseInt(a.stock_limit || a.alert_stock || a.stock_min || a.limit || 0);
-    });
+    // Stock alerts - try per-product or global endpoint
+    // Note: /stock_alert/ requires POST on some Hiboutik versions
+    // Fall back to 0 (alerts managed manually via stock_min field in app)
+    console.log('Stock alerts: using manual thresholds (API endpoint not available)');
 
     // Log for debugging
     if (products.length > 0) {
@@ -1821,6 +1814,13 @@ function loadProduitsFournisseur() {
   updateRecap();
 }
 
+function setCmdInputValues() {
+  document.querySelectorAll('[data-val]').forEach(inp => {
+    const v = parseInt(inp.dataset.val) || 0;
+    if (v > 0) inp.value = v;
+  });
+}
+
 function filterCmdArticles() {
   const q = document.getElementById('cmd-search').value.toLowerCase();
   const filtered = CMD.supProducts.filter(p => !q || p.products_name.toLowerCase().includes(q));
@@ -1847,15 +1847,17 @@ function renderCmdArticlesTable(prods) {
       <td class="text-right">${p.products_price>0?fmtEur(p.products_price):'-'}</td>
       <td class="text-right">${p.products_price_ttc>0?fmtEur(p.products_price_ttc):'-'}</td>
       <td class="text-right">
-        <input type="number" min="0" value="${qty}" id="cmd-qty-${p.products_id}"
+        <input type="number" min="0" id="cmd-qty-${p.products_id}"
           style="width:80px;padding:4px 8px;border:1.5px solid ${qty>0?'var(--tc)':'var(--border)'};border-radius:5px;font-family:inherit;font-size:12px;text-align:right;outline:none"
           onchange="setCmdQty(${p.products_id}, this.value)"
-          placeholder="${suggest>0?suggest:'0'}" />
+          placeholder="${suggest>0?suggest:0}"
+          data-val="${qty}" />
       </td>
       <td class="text-right bold" id="cmd-total-${p.products_id}">${total}</td>
     </tr>`;
   }).join('');
-}
+
+  setTimeout(setCmdInputValues, 50);}
 
 function toggleCmdArticle(id, suggest) {
   const chk = document.getElementById('cmd-chk-' + id);
