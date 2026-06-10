@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Gestion Stock Boutique - Contrées Vertes v3</title>
+<title>Boutique Contrées Vertes - Gestion des stocks</title>
 <style>
   :root {
     --tc:  #D88050;
@@ -530,14 +530,10 @@
 
     <!-- DASHBOARD -->
     <div id="screen-dashboard" class="screen">
-      <div class="page-top" style="display:flex;justify-content:space-between;align-items:flex-start">
-        <div>
-          <div class="page-title">Tableau de bord</div>
-          <div class="page-sub" id="dash-date">Chargement...</div>
-        </div>
-        <button class="btn-sm btn-out" onclick="showRawDebug()" id="btn-debug" style="font-size:11px;opacity:.6">🔍 Debug API</button>
+      <div class="page-top">
+        <div class="page-title">Tableau de bord</div>
+        <div class="page-sub" id="dash-date">Chargement...</div>
       </div>
-      <div id="debug-panel" style="display:none;background:#1a1a2e;color:#00ff88;padding:12px 16px;border-radius:8px;font-family:monospace;font-size:11px;margin-bottom:16px;white-space:pre-wrap;max-height:200px;overflow:auto"></div>
       <div class="kpi-grid" id="kpi-grid">
         <div class="kpi-card tc">
           <div class="kpi-label">Articles en stock</div>
@@ -1022,7 +1018,6 @@ async function loadHiboutikData() {
       fetchHiboutik('/categories/'),
       fetchHiboutik('/suppliers/'),
     ]);
-    console.log(`API: ${products.length} products, ${cats.length} categories, ${sups.length} suppliers`);
 
 
     APP.categories = {};
@@ -1054,8 +1049,7 @@ async function loadHiboutikData() {
         stockRaw = await fetchHiboutik(ep);
         if (Array.isArray(stockRaw) && stockRaw.length > 0) {
           stockEndpointUsed = ep;
-          console.log(`Stock endpoint OK: ${ep}, ${stockRaw.length} records, sample:`, stockRaw[0]);
-          break;
+                break;
         }
       } catch(e) { console.warn(`Stock endpoint ${ep} failed:`, e.message); }
     }
@@ -1067,7 +1061,6 @@ async function loadHiboutikData() {
       // inventory_alert is also in this endpoint
       if (s.inventory_alert !== undefined) alertMap[id] = parseInt(s.inventory_alert) || 0;
     });
-    console.log(`Stocks: ${Object.keys(stockMap).length} articles, alertes: ${Object.keys(alertMap).length}`);
 
     // inventory_alert already loaded from /stock_available/warehouse_id/1 above
 
@@ -1075,8 +1068,7 @@ async function loadHiboutikData() {
     if (products.length > 0) {
       APP._rawSample = products[0];
       APP._debug = { stockEndpointUsed, stockMapSize: Object.keys(stockMap).length, alertMapSize: Object.keys(alertMap).length, stockSample: Object.entries(stockMap).slice(0,5), vatSample: Object.entries(vatMap).slice(0,3) };
-      console.log('DEBUG:', APP._debug);
-    }
+      }
 
     APP.products = products.map(p => {
       const id    = p.product_id;
