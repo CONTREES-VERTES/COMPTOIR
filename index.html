@@ -850,31 +850,148 @@
     <div id="screen-arretstocks" class="screen">
       <div class="page-top">
         <div class="page-title">Arrêt des stocks dépôt-vente</div>
-        <div class="page-sub">Relevé des ventes à un instant T pour facturation par le producteur</div>
+        <div class="page-sub">Suivi des ventes par producteur avec historique des arrêts</div>
       </div>
 
-      <div class="table-card" style="margin-bottom:16px">
-        <div class="table-header" style="background:var(--bg1)">
-          <div>
+      <div class="tabs" id="dv-tabs">
+        <div class="tab active" onclick="switchDVTab('nouvel-arret')">Nouvel arrêt</div>
+        <div class="tab" onclick="switchDVTab('historique')">Historique</div>
+        <div class="tab" onclick="switchDVTab('depots')">Dépôts initiaux</div>
+      </div>
+
+      <!-- NOUVEL ARRÊT -->
+      <div id="dv-tab-nouvel-arret">
+        <div class="table-card" style="margin-bottom:16px">
+          <div class="table-header" style="background:var(--bg1)">
             <div class="table-header-title">Paramètres de l'arrêt</div>
+            <div class="table-actions">
+              <select class="filter" id="dv-filter-sup" onchange="loadDVData()">
+                <option value="">-- Choisir un producteur --</option>
+              </select>
+              <input type="date" id="dv-date-arret" style="padding:7px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:12px;outline:none;font-family:inherit" />
+              <button class="btn-sm btn-tc" onclick="preparerArret()">Calculer les ventes</button>
+            </div>
           </div>
-          <div class="table-actions">
-            <select class="filter" id="dv-filter-sup" onchange="renderArretDV()">
-              <option value="">Tous les producteurs</option>
-            </select>
-            <input type="date" id="dv-date-debut" style="padding:7px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:12px;outline:none;font-family:inherit" onchange="renderArretDV()" />
-            <input type="date" id="dv-date-fin" style="padding:7px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:12px;outline:none;font-family:inherit" onchange="renderArretDV()" />
-            <button class="btn-sm btn-tc" onclick="printArretDV()">🖨 Imprimer relevé</button>
-            <button class="btn-sm btn-vf" onclick="exportArretCSV()">⬇ Export CSV</button>
+        </div>
+
+        <!-- KPIs -->
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px" id="dv-kpis"></div>
+
+        <!-- Tableau de l'arrêt -->
+        <div class="table-card" style="margin-bottom:16px" id="dv-arret-card" style="display:none">
+          <div class="table-header">
+            <div class="table-header-title" id="dv-arret-titre">Détail des ventes</div>
+            <div class="table-actions">
+              <button class="btn-sm btn-out" onclick="printArretDV()">🖨 Relevé PDF</button>
+              <button class="btn-sm btn-vf" onclick="validerArretDV()">✓ Valider et enregistrer</button>
+            </div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Réf.</th><th>Article</th>
+                <th class="text-right">Stock précédent arrêt</th>
+                <th class="text-right">Dépôts depuis</th>
+                <th class="text-right">Stock actuel</th>
+                <th class="text-right">Vendu</th>
+                <th class="text-right">PV TTC</th>
+                <th class="text-right">CA TTC</th>
+                <th class="text-right">Net producteur</th>
+              </tr>
+            </thead>
+            <tbody id="dv-arret-tbody"></tbody>
+          </table>
+          <div style="padding:14px 16px;background:var(--vp);display:flex;justify-content:space-between;font-weight:bold">
+            <span>TOTAL</span>
+            <span id="dv-arret-total" style="color:var(--vf)"></span>
           </div>
         </div>
       </div>
 
-      <!-- KPIs DV -->
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px" id="dv-kpis"></div>
+      <!-- HISTORIQUE -->
+      <div id="dv-tab-historique" style="display:none">
+        <div class="table-card">
+          <div class="table-header">
+            <div class="table-header-title" id="dv-histo-count">Historique des arrêts</div>
+            <div class="table-actions">
+              <select class="filter" id="dv-histo-filter" onchange="renderHistorique()">
+                <option value="">Tous les producteurs</option>
+              </select>
+              <select class="filter" id="dv-histo-statut" onchange="renderHistorique()">
+                <option value="">Tous statuts</option>
+                <option value="En attente">En attente</option>
+                <option value="Payé">Payé</option>
+              </select>
+            </div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>N°</th><th>Date</th><th>Producteur</th><th>Article</th>
+                <th class="text-right">Vendu</th>
+                <th class="text-right">CA TTC</th>
+                <th class="text-right">Net producteur</th>
+                <th>Statut</th><th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="dv-histo-tbody"></tbody>
+          </table>
+        </div>
+      </div>
 
-      <!-- Tableau par producteur -->
-      <div id="arret-dv-content"></div>
+      <!-- DÉPÔTS INITIAUX -->
+      <div id="dv-tab-depots" style="display:none">
+        <div class="table-card" style="margin-bottom:16px">
+          <div class="table-header">
+            <div class="table-header-title">Enregistrer un nouveau dépôt</div>
+          </div>
+          <div style="padding:16px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px">
+            <div class="field">
+              <label>Producteur</label>
+              <select class="filter" id="depot-sup" style="width:100%;padding:9px 10px" onchange="loadDepotArticles()">
+                <option value="">-- Choisir --</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Date du dépôt</label>
+              <input type="date" id="depot-date" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:7px;font-size:13px;outline:none;font-family:inherit" />
+            </div>
+            <div class="field">
+              <label>Commentaire</label>
+              <input type="text" id="depot-comment" placeholder="Optionnel..." style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:7px;font-size:13px;outline:none;font-family:inherit" />
+            </div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Réf.</th><th>Article</th><th class="text-right">PV TTC</th>
+                <th class="text-right" style="width:130px">Quantité déposée</th>
+              </tr>
+            </thead>
+            <tbody id="depot-tbody">
+              <tr><td colspan="4"><div class="empty"><div class="empty-icon">🏭</div><div class="empty-text">Choisissez un producteur</div></div></td></tr>
+            </tbody>
+          </table>
+          <div style="padding:14px 16px;text-align:right">
+            <button class="btn-sm btn-tc" onclick="enregistrerDepot()">✓ Enregistrer le dépôt</button>
+          </div>
+        </div>
+
+        <!-- Historique dépôts -->
+        <div class="table-card">
+          <div class="table-header">
+            <div class="table-header-title">Historique des dépôts</div>
+          </div>
+          <table>
+            <thead>
+              <tr><th>Date</th><th>Producteur</th><th>Article</th><th class="text-right">Qté déposée</th><th class="text-right">PV TTC</th><th>Commentaire</th></tr>
+            </thead>
+            <tbody id="depot-histo-tbody">
+              <tr><td colspan="6"><div class="empty"><div class="empty-text">Aucun dépôt enregistré</div></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
 </div><!-- /layout -->
@@ -2437,240 +2554,409 @@ function imprimerCmd(id) {
 // ARRÊT DES STOCKS DÉPÔT-VENTE
 // ═══════════════════════════════════════════════════════════
 
-function initArretDV() {
-  // Remplir sélecteur producteurs - tous les fournisseurs (DV identifié si is_dv)
-  const allSups = [...new Set(APP.products.map(p => p.suppliers_name).filter(Boolean))].sort();
-  const dvSups  = [...new Set(APP.products.filter(p => p.is_dv && p.suppliers_name).map(p => p.suppliers_name))].sort();
-  const supList = dvSups.length > 0 ? dvSups : allSups;
-  const sel = document.getElementById('dv-filter-sup');
-  sel.innerHTML = '<option value="">Tous les producteurs</option>';
-  supList.forEach(s => sel.innerHTML += `<option value="${s}">${s}</option>`);
+let DV = {
+  data:       null,   // { lastStock, depots, historique }
+  arretLignes: [],    // lignes calculées pour l'arrêt en cours
+  currentSup: '',
+};
 
-  // Dates par défaut : 1er du mois courant -> aujourd'hui
-  const now   = new Date();
-  const debut = new Date(now.getFullYear(), now.getMonth(), 1);
-  document.getElementById('dv-date-debut').value = debut.toISOString().slice(0,10);
-  document.getElementById('dv-date-fin').value   = now.toISOString().slice(0,10);
-
-  renderArretDV();
+function switchDVTab(tab) {
+  ['nouvel-arret','historique','depots'].forEach(t => {
+    document.getElementById('dv-tab-' + t).style.display = t === tab ? '' : 'none';
+  });
+  document.querySelectorAll('#dv-tabs .tab').forEach((el, i) => {
+    el.classList.toggle('active', ['nouvel-arret','historique','depots'][i] === tab);
+  });
+  if (tab === 'historique') renderHistorique();
+  if (tab === 'depots')     renderDepotHisto();
 }
 
-function renderArretDV() {
-  const supFilter   = document.getElementById('dv-filter-sup').value;
-  const dateDebut   = document.getElementById('dv-date-debut').value;
-  const dateFin     = document.getElementById('dv-date-fin').value;
-  const dateDebutStr = dateDebut ? new Date(dateDebut).toLocaleDateString('fr-FR') : '-';
-  const dateFinStr   = dateFin   ? new Date(dateFin).toLocaleDateString('fr-FR')   : new Date().toLocaleDateString('fr-FR');
-
-  let dvProds = APP.products.filter(p => p.is_dv);
-  if (supFilter) dvProds = dvProds.filter(p => p.suppliers_name === supFilter);
-
-  // Calculs par article
-  const enriched = dvProds.map(p => {
-    const depose  = p.stock_depose || 0;
-    const restant = p.stock_available;
-    const vendu   = Math.max(0, depose - restant);
-    const caVente = vendu * p.products_price_ttc;
-    const commPct = p.commission_pct || 30;
-    const commission = caVente * commPct / 100;
-    const netProducteur = caVente - commission;
-    return { ...p, depose, restant, vendu, caVente, commPct, commission, netProducteur };
+async function initArretDV() {
+  // Remplir sélecteurs producteurs DV
+  const dvSups = [...new Set(APP.products.filter(p => p.is_dv && p.suppliers_name).map(p => p.suppliers_name))].sort();
+  ['dv-filter-sup','dv-histo-filter','depot-sup'].forEach(id => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    const first = sel.options[0].outerHTML;
+    sel.innerHTML = first;
+    dvSups.forEach(s => sel.innerHTML += `<option value="${s}">${s}</option>`);
   });
 
-  // KPIs globaux
-  const totalVendu   = enriched.reduce((s,p) => s + p.vendu, 0);
-  const totalCA      = enriched.reduce((s,p) => s + p.caVente, 0);
-  const totalComm    = enriched.reduce((s,p) => s + p.commission, 0);
-  const totalNet     = enriched.reduce((s,p) => s + p.netProducteur, 0);
+  // Date du jour
+  const today = new Date().toISOString().slice(0,10);
+  const dateEl = document.getElementById('dv-date-arret');
+  if (dateEl && !dateEl.value) dateEl.value = today;
+  const depDate = document.getElementById('depot-date');
+  if (depDate && !depDate.value) depDate.value = today;
 
-  document.getElementById('dv-kpis').innerHTML = `
-    <div class="kpi-card br"><div class="kpi-label">Articles vendus</div><div class="kpi-value">${totalVendu}</div><div class="kpi-sub">unités écoulées</div></div>
-    <div class="kpi-card tc"><div class="kpi-label">CA ventes TTC</div><div class="kpi-value" style="font-size:18px">${fmtEur(totalCA)}</div><div class="kpi-sub">chiffre d'affaires boutique</div></div>
-    <div class="kpi-card vf"><div class="kpi-label">Net producteurs</div><div class="kpi-value" style="font-size:18px">${fmtEur(totalNet)}</div><div class="kpi-sub">à reverser / à facturer</div></div>
-    <div class="kpi-card orange"><div class="kpi-label">Part boutique</div><div class="kpi-value" style="font-size:18px">${fmtEur(totalComm)}</div><div class="kpi-sub">part boutique</div></div>
-  `;
+  // Charger les données DV depuis Google Sheet
+  await loadDVData();
+}
 
-  // Grouper par producteur
-  const bySupplier = {};
-  enriched.forEach(p => {
-    const key = p.suppliers_name || 'Producteur non renseigné';
-    if (!bySupplier[key]) bySupplier[key] = [];
-    bySupplier[key].push(p);
+async function loadDVData() {
+  const sup = document.getElementById('dv-filter-sup')?.value || '';
+  DV.currentSup = sup;
+  DV.data = null;
+  document.getElementById('dv-kpis').innerHTML = '';
+  document.getElementById('dv-arret-tbody').innerHTML = '';
+
+  if (!APPS_SCRIPT_URL) return;
+  try {
+    const url = APPS_SCRIPT_URL + '?action=dv_data' + (sup ? '&supplier=' + encodeURIComponent(sup) : '');
+    const res  = await fetch(url);
+    const data = await res.json();
+    if (data.ok) DV.data = data;
+  } catch(e) { console.warn('DV data load failed:', e.message); }
+}
+
+async function preparerArret() {
+  const sup = document.getElementById('dv-filter-sup').value;
+  if (!sup) { alert('Choisissez un producteur.'); return; }
+
+  await loadDVData();
+
+  const dateArret = document.getElementById('dv-date-arret').value || new Date().toISOString().slice(0,10);
+  const dvProds   = APP.products.filter(p => p.is_dv && p.suppliers_name === sup);
+
+  DV.arretLignes = dvProds.map(p => {
+    const key = sup + '|' + p.products_id;
+    // Stock au moment du dernier arrêt (ou dépôt initial si premier arrêt)
+    const dernierArret = DV.data?.lastStock?.[key];
+    const stockRef     = dernierArret ? dernierArret.stock_apres : null;
+
+    // Dépôts depuis le dernier arrêt
+    const totalDepose  = DV.data?.depots?.[key]?.qty || 0;
+
+    // Stock actuel = stock Hiboutik
+    const stockActuel  = p.stock_available;
+
+    // Si pas de référence, on ne peut pas calculer
+    if (stockRef === null && totalDepose === 0) {
+      return { ...p, stockRef: null, totalDepose: 0, stockActuel, vendu: null, ca: 0, net: 0, manque_ref: true };
+    }
+
+    // Vendu = (stock de référence + dépôts depuis) - stock actuel
+    const baseCalc = (stockRef ?? 0) + totalDepose;
+    const vendu    = Math.max(0, baseCalc - stockActuel);
+    const ca       = vendu * p.products_price_ttc;
+    const commPct  = 30;
+    const net      = ca * (1 - commPct / 100);
+
+    return {
+      ...p, stockRef, totalDepose, stockActuel, vendu, ca, net,
+      commPct, manque_ref: false,
+      dernierArret: dernierArret?.date || null,
+    };
   });
 
-  const content = document.getElementById('arret-dv-content');
-  if (enriched.length === 0) {
-    content.innerHTML = `<div class="empty" style="background:var(--wht);border-radius:10px;box-shadow:var(--shadow)"><div class="empty-icon">🤝</div><div class="empty-text">Aucun article dépôt-vente</div></div>`;
+  renderArretTable();
+  updateArretKPIs();
+}
+
+function renderArretTable() {
+  const tbody = document.getElementById('dv-arret-tbody');
+  const sup   = document.getElementById('dv-filter-sup').value;
+
+  if (DV.arretLignes.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="9"><div class="empty"><div class="empty-text">Aucun article DV pour ce producteur</div></div></td></tr>`;
     return;
   }
 
-  content.innerHTML = Object.entries(bySupplier).map(([supplier, prods]) => {
-    const supCA   = prods.reduce((s,p) => s + p.caVente, 0);
-    const supComm = prods.reduce((s,p) => s + p.commission, 0);
-    const supNet  = prods.reduce((s,p) => s + p.netProducteur, 0);
-    const supVendu = prods.reduce((s,p) => s + p.vendu, 0);
-    const commPct  = prods[0]?.commPct || 30;
-
-    const rows = prods.map(p => `<tr>
-      <td class="mono">${p.products_id}</td>
-      <td class="bold">${p.products_name}</td>
-      <td class="text-right">${p.depose}</td>
-      <td class="text-right bold" style="color:${p.vendu>0?'var(--grn)':'var(--txt2)'}">${p.vendu}</td>
-      <td class="text-right">${p.restant}</td>
-      <td class="text-right">${fmtEur(p.products_price_ttc)}</td>
-      <td class="text-right bold">${p.vendu>0?fmtEur(p.caVente):'-'}</td>
-      <td class="text-right bold" style="color:var(--vf)">${p.vendu>0?fmtEur(p.netProducteur):'-'}</td>
-    </tr>`).join('');
-
-    return `<div class="table-card" style="margin-bottom:16px">
-      <div class="table-header" style="background:var(--bg1)">
-        <div>
-          <div class="table-header-title">🤝 ${supplier}</div>
-          <div style="font-size:11px;color:var(--txt2);margin-top:3px">
-            ${prods.length} référence(s) - ${supVendu} unités vendues -
-            CA : ${fmtEur(supCA)} -
-            <strong style="color:var(--vf)">Net à reverser : ${fmtEur(supNet)}</strong>
-          </div>
-        </div>
-        <div class="table-actions">
-          <button class="btn-sm btn-out" style="font-size:11px" onclick="printReleve('${supplier.replace(/'/g,"\\'")}', '${dateDebutStr}', '${dateFinStr}')">🖨 Relevé PDF</button>
-        </div>
-      </div>
-      <table>
-        <thead><tr>
-          <th>Réf.</th><th>Article</th>
-          <th class="text-right">Déposé</th><th class="text-right">Vendu</th><th class="text-right">Restant</th>
-          <th class="text-right">PV TTC</th><th class="text-right">CA TTC</th>
-          <th class="text-right">Net producteur</th>
-        </tr></thead>
-        <tbody>${rows}</tbody>
-        <tfoot>
-          <tr style="background:var(--vp);font-weight:bold">
-            <td colspan="3" style="padding:10px 12px;font-size:11px;color:var(--vf)">TOTAL ${supplier}</td>
-            <td class="text-right" style="padding:10px 12px;color:var(--grn)">${supVendu}</td>
-            <td></td>
-            <td></td>
-            <td class="text-right" style="padding:10px 12px">${fmtEur(supCA)}</td>
-            <td></td>
-            <td class="text-right" style="padding:10px 12px;color:var(--ora)">${fmtEur(supComm)}</td>
-            <td class="text-right" style="padding:10px 12px;color:var(--vf)">${fmtEur(supNet)}</td>
-          </tr>
-        </tfoot>
-      </table>
-    </div>`;
+  tbody.innerHTML = DV.arretLignes.map(l => {
+    if (l.manque_ref) {
+      return `<tr style="background:#fff8f0">
+        <td class="mono">${l.products_id}</td>
+        <td class="bold">${l.products_name}</td>
+        <td colspan="5" style="color:var(--ora);font-size:11px">⚠️ Aucun dépôt initial enregistré - allez dans "Dépôts initiaux" pour saisir la quantité déposée</td>
+        <td>-</td><td>-</td>
+      </tr>`;
+    }
+    return `<tr>
+      <td class="mono">${l.products_id}</td>
+      <td class="bold">${l.products_name}</td>
+      <td class="text-right">${l.stockRef !== null ? l.stockRef : '<span style="color:var(--ora)">-</span>'}</td>
+      <td class="text-right">${l.totalDepose > 0 ? '+' + l.totalDepose : '-'}</td>
+      <td class="text-right bold">${l.stockActuel}</td>
+      <td class="text-right bold" style="color:${l.vendu > 0 ? 'var(--grn)' : 'var(--txt2)'}">${l.vendu}</td>
+      <td class="text-right">${fmtEur(l.products_price_ttc)}</td>
+      <td class="text-right bold">${l.vendu > 0 ? fmtEur(l.ca) : '-'}</td>
+      <td class="text-right bold" style="color:var(--vf)">${l.vendu > 0 ? fmtEur(l.net) : '-'}</td>
+    </tr>`;
   }).join('');
+
+  const totalCA  = DV.arretLignes.reduce((s,l) => s + (l.ca  ||0), 0);
+  const totalNet = DV.arretLignes.reduce((s,l) => s + (l.net ||0), 0);
+  document.getElementById('dv-arret-total').textContent = `CA : ${fmtEur(totalCA)} — Net producteur : ${fmtEur(totalNet)}`;
+  document.getElementById('dv-arret-card').style.display = '';
+  document.getElementById('dv-arret-titre').textContent = `Arrêt DV - ${document.getElementById('dv-filter-sup').value}`;
 }
 
-function printReleve(supplier, dateDebut, dateFin) {
-  const supFilter = document.getElementById('dv-filter-sup').value;
-  let dvProds = APP.products.filter(p => p.is_dv && (p.suppliers_name === supplier));
-  const enriched = dvProds.map(p => {
-    const depose = p.stock_depose || 0;
-    const restant = p.stock_available;
-    const vendu = Math.max(0, depose - restant);
-    const caVente = vendu * p.products_price_ttc;
-    const commPct = p.commission_pct || 30;
-    const commission = caVente * commPct / 100;
-    const netProducteur = caVente - commission;
-    return { ...p, depose, restant, vendu, caVente, commPct, commission, netProducteur };
-  });
+function updateArretKPIs() {
+  const lignes    = DV.arretLignes.filter(l => !l.manque_ref);
+  const totalVendu = lignes.reduce((s,l) => s + (l.vendu||0), 0);
+  const totalCA   = lignes.reduce((s,l) => s + (l.ca||0), 0);
+  const totalNet  = lignes.reduce((s,l) => s + (l.net||0), 0);
+  const nbManque  = DV.arretLignes.filter(l => l.manque_ref).length;
 
-  const totalCA   = enriched.reduce((s,p) => s + p.caVente, 0);
-  const totalComm = enriched.reduce((s,p) => s + p.commission, 0);
-  const totalNet  = enriched.reduce((s,p) => s + p.netProducteur, 0);
-  const commPct   = enriched[0]?.commPct || 30;
+  document.getElementById('dv-kpis').innerHTML = `
+    <div class="kpi-card tc"><div class="kpi-label">Unités vendues</div><div class="kpi-value">${totalVendu}</div></div>
+    <div class="kpi-card vf"><div class="kpi-label">CA TTC</div><div class="kpi-value" style="font-size:18px">${fmtEur(totalCA)}</div></div>
+    <div class="kpi-card br"><div class="kpi-label">Net producteur</div><div class="kpi-value" style="font-size:18px">${fmtEur(totalNet)}</div></div>
+    ${nbManque > 0 ? `<div class="kpi-card orange"><div class="kpi-label">Sans dépôt initial</div><div class="kpi-value text-ora">${nbManque}</div><div class="kpi-sub">à renseigner</div></div>` : ''}
+  `;
+}
+
+async function validerArretDV() {
+  const sup       = document.getElementById('dv-filter-sup').value;
+  const dateArret = document.getElementById('dv-date-arret').value;
+  const lignesOK  = DV.arretLignes.filter(l => !l.manque_ref && l.vendu !== null);
+
+  if (!lignesOK.length) { alert('Aucune ligne à enregistrer.'); return; }
+  if (!confirm(`Valider l'arrêt DV pour ${sup} au ${dateArret} ?
+${lignesOK.length} article(s) enregistré(s).`)) return;
+
+  const payload = {
+    action: 'save_arret_dv',
+    date_arret: dateArret,
+    lignes: lignesOK.map(l => ({
+      supplier_name:  l.suppliers_name,
+      product_id:     l.products_id,
+      product_name:   l.products_name,
+      stock_avant:    (l.stockRef ?? 0) + l.totalDepose,
+      stock_apres:    l.stockActuel,
+      qty_vendue:     l.vendu,
+      pv_ttc:         l.products_price_ttc,
+      ca_ttc:         l.ca,
+      commission_pct: l.commPct || 30,
+      net_producteur: l.net,
+    }))
+  };
+
+  try {
+    await fetch(APPS_SCRIPT_URL, {
+      method: 'POST', mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload),
+    });
+    alert(`Arrêt validé et enregistré dans Google Sheet !
+${lignesOK.length} ligne(s) sauvegardée(s).`);
+    await loadDVData();
+    printArretDV();
+  } catch(e) { alert("Erreur lors de l'enregistrement : " + e.message); }
+}
+
+function printArretDV() {
+  const sup       = document.getElementById('dv-filter-sup').value || 'Tous';
+  const dateArret = document.getElementById('dv-date-arret').value || new Date().toLocaleDateString('fr-FR');
   const today     = new Date().toLocaleDateString('fr-FR');
+  const ADRESSE   = '14 place Gambetta - 19000 Tulle | SIRET : 51966219100039';
+  const lignes    = DV.arretLignes.filter(l => !l.manque_ref && l.vendu !== null);
+  const commPct   = 30;
 
-  const rows = enriched.map(p => `<tr>
-    <td>${p.products_id}</td><td>${p.products_name}</td>
-    <td style="text-align:right">${p.depose}</td>
-    <td style="text-align:right;font-weight:bold;color:${p.vendu>0?'#27AE60':'#888'}">${p.vendu}</td>
-    <td style="text-align:right">${p.restant}</td>
-    <td style="text-align:right">${fmtEur(p.products_price_ttc)}</td>
-    <td style="text-align:right;font-weight:bold">${p.vendu>0?fmtEur(p.caVente):'-'}</td>
-    <td style="text-align:right;font-weight:bold;color:#4B6239">${p.vendu>0?fmtEur(p.netProducteur):'-'}</td>
+  const totalCA  = lignes.reduce((s,l) => s + (l.ca||0), 0);
+  const totalNet = lignes.reduce((s,l) => s + (l.net||0), 0);
+  const totalComm = totalCA - totalNet;
+  const totalVendu = lignes.reduce((s,l) => s + (l.vendu||0), 0);
+
+  const rows = lignes.map(l => `<tr>
+    <td>${l.products_id}</td><td>${l.products_name}</td>
+    <td style="text-align:right">${l.stockRef !== null ? l.stockRef : '-'}</td>
+    <td style="text-align:right">${l.totalDepose > 0 ? '+' + l.totalDepose : '-'}</td>
+    <td style="text-align:right">${l.stockActuel}</td>
+    <td style="text-align:right;font-weight:bold;color:#27AE60">${l.vendu}</td>
+    <td style="text-align:right">${fmtEur(l.products_price_ttc)}</td>
+    <td style="text-align:right;font-weight:bold">${l.vendu > 0 ? fmtEur(l.ca) : '-'}</td>
+    <td style="text-align:right;font-weight:bold;color:#4B6239">${l.vendu > 0 ? fmtEur(l.net) : '-'}</td>
   </tr>`).join('');
 
   const win = window.open('','_blank');
-  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Relevé DV - ${supplier}</title>
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Relevé DV - ${sup}</title>
   <style>body{font-family:Helvetica,Arial,sans-serif;font-size:12px;margin:40px;color:#2a2a2a}
-  h1{font-size:18px;color:#575756;margin-bottom:4px}.sub{color:#888;font-size:11px;margin-bottom:24px}
-  .info-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}
-  .info-box{background:#f8f7f2;padding:12px;border-radius:6px;text-align:center}
-  .info-label{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:#888;margin-bottom:4px}
-  .info-value{font-size:15px;font-weight:bold}
-  .info-value.green{color:#4B6239}.info-value.orange{color:#E07020}.info-value.tc{color:#D88050}
-  table{width:100%;border-collapse:collapse;margin-top:8px}
+  h1{font-size:18px;color:#575756;margin-bottom:2px}.sub{color:#888;font-size:11px;margin-bottom:20px}
+  .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px}
+  .info-box{background:#f8f7f2;padding:10px 12px;border-radius:6px}
+  .info-label{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:#888;margin-bottom:3px}
+  .info-value{font-size:13px;font-weight:bold}
+  .kpi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px}
+  .kpi-box{padding:12px;border-radius:6px;text-align:center}
+  .kpi-label{font-size:10px;text-transform:uppercase;color:#888;margin-bottom:4px}
+  .kpi-value{font-size:18px;font-weight:bold}
+  table{width:100%;border-collapse:collapse}
   th{text-align:left;padding:7px 9px;font-size:10px;text-transform:uppercase;background:#575756;color:#fff}
   td{padding:7px 9px;border-bottom:1px solid #eee}
   .total-row td{font-weight:bold;background:#D0E3B9;border-top:2px solid #4B6239}
-  .text-right{text-align:right}
-  .footer{margin-top:32px;font-size:10px;color:#aaa;border-top:1px solid #eee;padding-top:12px}
-  .sign-grid{display:grid;grid-template-columns:1fr 1fr;gap:32px;margin-top:32px}
-  .sign-box{border-top:1px solid #ccc;padding-top:8px}
-  .sign-label{font-size:10px;color:#888}</style>
+  .total-ttc{background:#D88050;color:#fff;font-weight:bold;font-size:14px}
+  .sign-grid{display:grid;grid-template-columns:1fr 1fr;gap:32px;margin-top:28px}
+  .sign-box .sign-label{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:#888;margin-bottom:6px}
+  .sign-line{border-top:1px solid #bbb;height:48px}
+  .footer{margin-top:24px;font-size:10px;color:#aaa;border-top:1px solid #eee;padding-top:10px}</style>
   </head><body>
   <h1>Relevé de ventes - Dépôt-vente</h1>
-  <div class="sub">Boutique Contrées Vertes &nbsp;|&nbsp; 14 place Gambetta - 19000 Tulle | SIRET : 51966219100039<br>
-  Période : du ${dateDebut} au ${dateFin} - Édité le ${today}</div>
-  <div style="background:#f0ede3;padding:14px 16px;border-radius:8px;margin-bottom:20px">
-    <div style="font-size:11px;color:#888;margin-bottom:2px">Producteur / Fournisseur</div>
-    <div style="font-size:16px;font-weight:bold">${supplier}</div>
-    <div style="font-size:11px;color:#888;margin-top:4px">Commission convenue : ${commPct}%</div>
-  </div>
+  <div class="sub">Boutique Contrées Vertes | ${ADRESSE}<br>Édité le ${today}</div>
   <div class="info-grid">
-    <div class="info-box"><div class="info-label">Unités vendues</div><div class="info-value tc">${enriched.reduce((s,p)=>s+p.vendu,0)}</div></div>
-    <div class="info-box"><div class="info-label">CA ventes TTC</div><div class="info-value tc">${fmtEur(totalCA)}</div></div>
-    <div class="info-box"><div class="info-label">Part boutique retenue</div><div class="info-value orange">${fmtEur(totalComm)}</div></div>
-    <div class="info-box"><div class="info-label">Net à reverser / à facturer</div><div class="info-value green">${fmtEur(totalNet)}</div></div>
+    <div class="info-box"><div class="info-label">Producteur</div><div class="info-value">${sup}</div></div>
+    <div class="info-box"><div class="info-label">Date de l'arrêt</div><div class="info-value">${new Date(dateArret).toLocaleDateString('fr-FR')}</div></div>
+    <div class="info-box"><div class="info-label">Articles concernés</div><div class="info-value">${lignes.length}</div></div>
+    <div class="info-box"><div class="info-label">Part boutique retenue</div><div class="info-value">${commPct}%</div></div>
+  </div>
+  <div class="kpi-grid">
+    <div class="kpi-box" style="background:#D0E3B9"><div class="kpi-label">Unités vendues</div><div class="kpi-value" style="color:#4B6239">${totalVendu}</div></div>
+    <div class="kpi-box" style="background:#fff8f0"><div class="kpi-label">CA ventes TTC</div><div class="kpi-value" style="color:#D88050">${fmtEur(totalCA)}</div></div>
+    <div class="kpi-box" style="background:#4B6239"><div class="kpi-label" style="color:#D0E3B9">Net à facturer</div><div class="kpi-value" style="color:#fff">${fmtEur(totalNet)}</div></div>
   </div>
   <table>
     <thead><tr>
-      <th>Réf.</th><th>Article</th><th class="text-right">Déposé</th><th class="text-right">Vendu</th>
-      <th class="text-right">Restant</th><th class="text-right">PV TTC</th>
-      <th class="text-right">CA TTC</th><th class="text-right">Net producteur</th>
+      <th>Réf.</th><th>Article</th>
+      <th style="text-align:right">Réf. précédente</th>
+      <th style="text-align:right">Dépôts +</th>
+      <th style="text-align:right">Stock actuel</th>
+      <th style="text-align:right">Vendu</th>
+      <th style="text-align:right">PV TTC</th>
+      <th style="text-align:right">CA TTC</th>
+      <th style="text-align:right">Net producteur</th>
     </tr></thead>
-    <tbody>
-      ${rows}
-      <tr class="total-row">
-        <td colspan="6">TOTAL</td>
-        <td class="text-right">${fmtEur(totalCA)}</td>
-        <td class="text-right" style="color:#4B6239">${fmtEur(totalNet)}</td>
-      </tr>
+    <tbody>${rows}
+    <tr class="total-row"><td colspan="7">TOTAL</td><td style="text-align:right">${fmtEur(totalCA)}</td><td style="text-align:right">${fmtEur(totalNet)}</td></tr>
+    <tr class="total-ttc"><td colspan="7">NET À REVERSER AU PRODUCTEUR</td><td colspan="2" style="text-align:right;font-size:16px">${fmtEur(totalNet)}</td></tr>
     </tbody>
   </table>
   <div class="sign-grid">
-    <div class="sign-box"><div class="sign-label">Signature Boutique Contrées Vertes</div><div style="height:50px"></div></div>
-    <div class="sign-box"><div class="sign-label">Signature Producteur / Bon pour accord</div><div style="height:50px"></div></div>
+    <div class="sign-box"><div class="sign-label">Signature Boutique Contrées Vertes</div><div class="sign-line"></div></div>
+    <div class="sign-box"><div class="sign-label">Signature Producteur / Bon pour accord</div><div class="sign-line"></div></div>
   </div>
-  <div class="footer">Ce relevé sert de base à la facturation du producteur pour la période indiquée.<br>
-  Boutique Contrées Vertes - Généré le ${today}</div>
+  <div class="footer">Ce relevé sert de base à la facturation du producteur. Boutique Contrées Vertes - Généré le ${today}</div>
   <script>window.onload=()=>window.print()<\/script></body></html>`);
   win.document.close();
 }
 
-function exportArretCSV() {
-  const supFilter = document.getElementById('dv-filter-sup').value;
-  let dvProds = APP.products.filter(p => p.is_dv);
-  if (supFilter) dvProds = dvProds.filter(p => p.suppliers_name === supFilter);
+// ── HISTORIQUE ──────────────────────────────────────────────────────────────
+async function renderHistorique() {
+  if (!DV.data) await loadDVData();
+  const supFilter    = document.getElementById('dv-histo-filter').value;
+  const statutFilter = document.getElementById('dv-histo-statut').value;
 
-  const enriched = dvProds.map(p => {
-    const depose = p.stock_depose || 0;
-    const restant = p.stock_available;
-    const vendu = Math.max(0, depose - restant);
-    const caVente = vendu * p.products_price_ttc;
-    const commPct = p.commission_pct || 30;
-    const commission = caVente * commPct / 100;
-    const netProducteur = caVente - commission;
-    return { ...p, depose, restant, vendu, caVente, commPct, commission, netProducteur };
+  let lignes = (DV.data?.historique || []);
+  if (supFilter)    lignes = lignes.filter(l => l.supplier_name === supFilter);
+  if (statutFilter) lignes = lignes.filter(l => l.statut === statutFilter);
+
+  // Trier par date desc
+  lignes.sort((a,b) => (b.arret_id||0) - (a.arret_id||0));
+
+  document.getElementById('dv-histo-count').textContent = `${lignes.length} ligne(s) dans l'historique`;
+
+  const tbody = document.getElementById('dv-histo-tbody');
+  if (!lignes.length) {
+    tbody.innerHTML = `<tr><td colspan="9"><div class="empty"><div class="empty-icon">📋</div><div class="empty-text">Aucun arrêt enregistré</div></div></td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = lignes.map(l => `<tr>
+    <td class="mono">#${l.arret_id}</td>
+    <td>${l.date_arret ? new Date(l.date_arret).toLocaleDateString('fr-FR') : '-'}</td>
+    <td class="bold">${l.supplier_name}</td>
+    <td>${l.product_name}</td>
+    <td class="text-right">${l.qty_vendue}</td>
+    <td class="text-right">${fmtEur(l.ca_ttc)}</td>
+    <td class="text-right bold" style="color:var(--vf)">${fmtEur(l.net_producteur)}</td>
+    <td>${l.statut === 'Payé' ? '<span class="badge badge-green">Payé</span>' : '<span class="badge badge-orange">En attente</span>'}</td>
+    <td>${l.statut !== 'Payé' ? `<button class="btn-sm btn-vf" style="font-size:11px;padding:4px 10px" onclick="marquerPayeDV(${l.arret_id})">✓ Payé</button>` : ''}</td>
+  </tr>`).join('');
+}
+
+async function marquerPayeDV(arret_id) {
+  if (!confirm('Marquer cette ligne comme payée ?')) return;
+  try {
+    await fetch(APPS_SCRIPT_URL, {
+      method: 'POST', mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'update_arret_statut', arret_id, statut: 'Payé' }),
+    });
+    await loadDVData();
+    renderHistorique();
+  } catch(e) { alert('Erreur : ' + e.message); }
+}
+
+// ── DÉPÔTS INITIAUX ──────────────────────────────────────────────────────────
+function loadDepotArticles() {
+  const sup = document.getElementById('depot-sup').value;
+  if (!sup) {
+    document.getElementById('depot-tbody').innerHTML = `<tr><td colspan="4"><div class="empty"><div class="empty-icon">🏭</div><div class="empty-text">Choisissez un producteur</div></div></td></tr>`;
+    return;
+  }
+  const prods = APP.products.filter(p => p.is_dv && p.suppliers_name === sup);
+  document.getElementById('depot-tbody').innerHTML = prods.map(p => `<tr>
+    <td class="mono">${p.products_id}</td>
+    <td class="bold">${p.products_name}</td>
+    <td class="text-right">${fmtEur(p.products_price_ttc)}</td>
+    <td class="text-right">
+      <input type="number" min="0" value="0" id="dep-qty-${p.products_id}"
+        style="width:80px;padding:4px 8px;border:1.5px solid var(--border);border-radius:5px;font-size:12px;text-align:right;font-family:inherit;outline:none" />
+    </td>
+  </tr>`).join('');
+}
+
+async function enregistrerDepot() {
+  const sup     = document.getElementById('depot-sup').value;
+  const date    = document.getElementById('depot-date').value;
+  const comment = document.getElementById('depot-comment').value;
+
+  if (!sup) { alert('Choisissez un producteur.'); return; }
+  if (!date) { alert('Indiquez une date.'); return; }
+
+  const prods = APP.products.filter(p => p.is_dv && p.suppliers_name === sup);
+  const lignes = prods.map(p => ({
+    supplier_name: p.suppliers_name,
+    product_id:    p.products_id,
+    product_name:  p.products_name,
+    qty_deposee:   parseInt(document.getElementById('dep-qty-' + p.products_id)?.value) || 0,
+    pv_ttc:        p.products_price_ttc,
+    commentaire:   comment,
+  })).filter(l => l.qty_deposee > 0);
+
+  if (!lignes.length) { alert('Saisissez au moins une quantité.'); return; }
+
+  try {
+    await fetch(APPS_SCRIPT_URL, {
+      method: 'POST', mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'save_depot', date_depot: date, lignes }),
+    });
+    alert(`Dépôt enregistré - ${lignes.length} article(s) pour ${sup}`);
+    await loadDVData();
+    renderDepotHisto();
+    loadDepotArticles();
+  } catch(e) { alert('Erreur : ' + e.message); }
+}
+
+async function renderDepotHisto() {
+  if (!DV.data) await loadDVData();
+  // Les dépôts sont dans DV.data.depots (agrégés par article)
+  // Pour l'historique détaillé, on affiche ce qu'on a
+  const tbody = document.getElementById('depot-histo-tbody');
+  const depots = DV.data?.depots || {};
+  const rows = Object.entries(depots).map(([key, d]) => {
+    const [sup, prodId] = key.split('|');
+    const prod = APP.products.find(p => p.products_id === parseInt(prodId));
+    return `<tr>
+      <td>-</td>
+      <td>${sup}</td>
+      <td>${prod?.products_name || prodId}</td>
+      <td class="text-right bold">${d.qty}</td>
+      <td class="text-right">${fmtEur(d.pv)}</td>
+      <td>-</td>
+    </tr>`;
   });
+  tbody.innerHTML = rows.length ? rows.join('') : `<tr><td colspan="6"><div class="empty"><div class="empty-text">Aucun dépôt enregistré</div></div></td></tr>`;
+}
 
+// ── EXPORTS CSV ───────────────────────────────────────────────────────────────
+function exportArretCSV() {
+  const lignes = DV.arretLignes.filter(l => !l.manque_ref);
   const bom = '\uFEFF';
-  const header = 'Référence;Désignation;Producteur;Déposé;Vendu;Restant;PV TTC;CA TTC;Net producteur\n';
-  const rows = enriched.map(p =>
-    `${p.products_id};${p.products_name};${p.suppliers_name||''};${p.depose};${p.vendu};${p.restant};${p.products_price_ttc.toFixed(2).replace('.',',')};${p.caVente.toFixed(2).replace('.',',')};${p.netProducteur.toFixed(2).replace('.',',')}`)
+  const header = 'Référence;Désignation;Producteur;Réf. précédente;Dépôts;Stock actuel;Vendu;PV TTC;CA TTC;Net producteur\n';
+  const rows = lignes.map(l =>
+    `${l.products_id};${l.products_name};${l.suppliers_name};${l.stockRef??''};${l.totalDepose};${l.stockActuel};${l.vendu};${l.products_price_ttc.toFixed(2).replace('.',',')};${l.ca.toFixed(2).replace('.',',')};${l.net.toFixed(2).replace('.',',')}`)
     .join('\n');
-
   const blob = new Blob([bom + header + rows], {type:'text/csv;charset=utf-8'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
