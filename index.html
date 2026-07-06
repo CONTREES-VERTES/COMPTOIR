@@ -1085,8 +1085,9 @@ async function loadHiboutikData() {
       const pv      = pvTTC;
       const stock = stockMap[id] ?? 0;
       const smin  = alertMap[id] ?? 0;
-      const brandName = APP.brandMap[p.product_brand] || '';
-      const isDV = brandName === 'DV' || brandName.includes('DÉPÔT') || brandName.includes('DEPOT');
+      const brandName = (APP.brandMap && APP.brandMap[p.product_brand]) || '';
+      // brand_id 3 = DV, brand_id 4 = ACHAT (confirmé Hiboutik Contrées Vertes)
+      const isDV = p.product_brand === 3 || brandName === 'DV' || brandName.includes('DÉPÔT') || brandName.includes('DEPOT');
       return {
         products_id: id,
         products_name: name,
@@ -2666,4 +2667,3 @@ function exportArretCSV() {
 }
 </script></body>
 </html>
-
