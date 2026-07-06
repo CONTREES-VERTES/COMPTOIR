@@ -1912,7 +1912,7 @@ let CMD = {
 
 // ── PERSISTANCE PARTAGÉE - GOOGLE SHEET ─────────────────────────────────────
 // URL du Web App Apps Script - à renseigner après déploiement
-let APPS_SCRIPT_URL = localStorage.getItem('cv_apps_script_url') || 'https://script.google.com/macros/s/AKfycby2jVJI8Zg0OUITIzkXyprOSaPubr88s6KCSxQ8xFHPAcMSWCkEae7jAk9qIFCqenL17Q/exec';
+let APPS_SCRIPT_URL = localStorage.getItem('cv_apps_script_url') || 'https://script.google.com/macros/s/AKfycby6P5eWJRIK9jkaQNGwyi2vdCSXdwGU61fknGjuWZJ-Z7AI2r39cvs1xGYJMiKJtJQs9Q/exec';
 
 function setAppsScriptURL(url) {
   APPS_SCRIPT_URL = url;
@@ -1937,7 +1937,6 @@ function setSyncIndicator(active, msg = '') {
 async function saveCommandes(action, payload = {}) {
   if (!APPS_SCRIPT_URL) return;
   try {
-    // Apps Script Web App : POST avec text/plain + no-cors pour éviter preflight
     const body = JSON.stringify({ action, ...payload });
     await fetch(APPS_SCRIPT_URL, {
       method: 'POST',
@@ -1946,6 +1945,21 @@ async function saveCommandes(action, payload = {}) {
       body,
     });
   } catch(e) { console.warn('Sync Google Sheet:', e.message); }
+}
+
+// POST fiable vers Apps Script (utilisé pour DV)
+async function postToSheet(action, payload = {}) {
+  if (!APPS_SCRIPT_URL) return { ok: false };
+  try {
+    const body = JSON.stringify({ action, ...payload });
+    // Utiliser GET avec données encodées - contourne le problème no-cors
+    const url = APPS_SCRIPT_URL + '?action=' + action + '&data=' + encodeURIComponent(body);
+    const res = await fetch(url);
+    return await res.json();
+  } catch(e) {
+    console.warn('postToSheet failed:', e.message);
+    return { ok: false, error: e.message };
+  }
 }
 
 async function loadCommandes() {
@@ -2876,11 +2890,7 @@ async function renderHistorique() {
 async function marquerPayeDV(arret_id) {
   if (!confirm('Marquer cette ligne comme payée ?')) return;
   try {
-    await fetch(APPS_SCRIPT_URL, {
-      method: 'POST', mode: 'no-cors',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action: 'update_arret_statut', arret_id, statut: 'Payé' }),
-    });
+    await postToSheet('update_arret_statut', { arret_id, statut: 'Payé' });
     await loadDVData();
     renderHistorique();
   } catch(e) { alert('Erreur : ' + e.message); }
@@ -2926,12 +2936,12 @@ async function enregistrerDepot() {
   if (!lignes.length) { alert('Saisissez au moins une quantité.'); return; }
 
   try {
-    await fetch(APPS_SCRIPT_URL, {
-      method: 'POST', mode: 'no-cors',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action: 'save_depot', date_depot: date, lignes }),
-    });
-    alert(`Dépôt enregistré - ${lignes.length} article(s) pour ${sup}`);
+    const resDepot = await postToSheet('save_depot', { date_depot: date, lignes });
+    if (resDepot.ok) {
+      alert(`Dépôt enregistré - ${lignes.length} article(s) pour ${sup}`);
+    } else {
+      alert('Dépôt enregistré localement. Vérifiez le Google Sheet.');
+    }
     await loadDVData();
     renderDepotHisto();
     loadDepotArticles();
