@@ -1206,7 +1206,7 @@ async function loadHiboutikData() {
     // Log for debugging
     if (products.length > 0) {
       APP._rawSample = products[0];
-      APP._debug = { stockEndpointUsed, stockMapSize: Object.keys(stockMap).length, alertMapSize: Object.keys(alertMap).length, stockSample: Object.entries(stockMap).slice(0,5), vatSample: Object.entries(vatMap).slice(0,3) };
+      APP._debug = { stockMapSize: Object.keys(stockMap).length, alertMapSize: Object.keys(alertMap).length };
       }
 
     APP.products = products.map(p => {
