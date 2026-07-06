@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Boutique Contrées Vertes - Gestion des  stocks v4</title>
+<title>Boutique Contrées Vertes - Gestion des stocks v4</title>
 <style>
   :root {
     --tc:  #D88050;
@@ -1011,8 +1011,22 @@ async function fetchHiboutik(endpoint) {
 async function loadHiboutikData() {
   setSyncStatus('loading', 'Chargement...');
   try {
+    // Fetch all products pages (Hiboutik pagine par 250)
+    async function fetchAllPages(endpoint) {
+      let all = [], page = 1;
+      while (true) {
+        const ep = page === 1 ? endpoint : endpoint + '?p=' + page;
+        const batch = await fetchHiboutik(ep);
+        if (!Array.isArray(batch) || batch.length === 0) break;
+        all = all.concat(batch);
+        if (batch.length < 250) break;
+        page++;
+      }
+      return all;
+    }
+
     const [products, cats, sups] = await Promise.all([
-      fetchHiboutik('/products/'),
+      fetchAllPages('/products/'),
       fetchHiboutik('/categories/'),
       fetchHiboutik('/suppliers/'),
     ]);
