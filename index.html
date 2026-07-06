@@ -1085,7 +1085,8 @@ async function loadHiboutikData() {
       const pv      = pvTTC;
       const stock = stockMap[id] ?? 0;
       const smin  = alertMap[id] ?? 0;
-      const isDV  = p.product_brand === 4 || false; // ajustable selon config boutique
+      const brandName = APP.brandMap[p.product_brand] || '';
+      const isDV = brandName === 'DV' || brandName.includes('DÉPÔT') || brandName.includes('DEPOT');
       return {
         products_id: id,
         products_name: name,
@@ -1733,6 +1734,7 @@ function printInventaire() {
   <style>body{font-family:Helvetica,Arial,sans-serif;font-size:11px;margin:30px}h1{font-size:16px}table{width:100%;border-collapse:collapse}th{text-align:left;padding:6px 8px;background:#575756;color:#fff;font-size:10px;text-transform:uppercase}td{padding:6px 8px;border-bottom:1px solid #eee}.text-right{text-align:right}</style>
   </head><body>
   <h1>Feuille d'inventaire - Boutique Contrées Vertes</h1>
+  <p style="color:#888;font-size:10px">Boutique Contrées Vertes &nbsp;|&nbsp; 14 place Gambetta - 19000 Tulle | SIRET : 51966219100039</p>
   <p style="color:#888;font-size:10px">Date : ${today} | ${cat||'Toutes catégories'} | Réalisé par : ________________</p>
   <table><thead><tr><th>Réf.</th><th>Article</th><th>Catégorie</th><th>Fournisseur</th><th class="text-right">Stock théorique</th><th class="text-right">Stock réel</th><th class="text-right">Écart</th></tr></thead>
   <tbody>${rows}</tbody></table>
@@ -2146,7 +2148,7 @@ function printNewBC() {
   </style>
   </head><body>
   <h1>Bon de commande n° BC-${String(CMD.nextId).padStart(4,'0')}</h1>
-  <div class="sub">Boutique Contrées Vertes &nbsp;|&nbsp; <em>Non assujetti à la TVA</em></div>
+  <div class="sub">Boutique Contrées Vertes &nbsp;|&nbsp; 14 place Gambetta - 19000 Tulle | SIRET : 51966219100039<br><em>Non assujetti à la TVA</em></div>
 
   <div class="info-grid">
     <div class="info-box"><div class="info-label">Fournisseur</div><div class="info-value">${sup}</div></div>
@@ -2412,6 +2414,7 @@ function imprimerCmd(id) {
   table{width:100%;border-collapse:collapse}th{text-align:left;padding:7px 9px;background:#575756;color:#fff;font-size:10px;text-transform:uppercase}
   td{padding:7px 9px;border-bottom:1px solid #eee}</style></head><body>
   <h1>Commande #${String(id).padStart(4,'0')} - ${cmd.sup}</h1>
+  <p style="color:#888;font-size:11px">Boutique Contrées Vertes &nbsp;|&nbsp; 14 place Gambetta - 19000 Tulle | SIRET : 51966219100039</p>
   <p style="color:#888;font-size:11px">Date : ${dateStr} | Statut : ${cmd.statut}</p>
   <table><thead><tr><th>Réf.</th><th>Article</th><th>Commandé</th><th>PA HT</th><th>PV TTC</th><th>Total HT</th><th>Total TTC</th><th>État</th><th>Reçu</th></tr></thead>
   <tbody>${rows}<tr style="font-weight:bold;background:#fff8f0"><td colspan="5">TOTAL</td><td>${fmtEur(cmd.totalHT)}</td><td>${fmtEur(cmd.totalTTC||cmd.totalHT)}</td><td colspan="2"></td></tr></tbody></table>
@@ -2506,8 +2509,6 @@ function renderArretDV() {
       <td class="text-right">${p.restant}</td>
       <td class="text-right">${fmtEur(p.products_price_ttc)}</td>
       <td class="text-right bold">${p.vendu>0?fmtEur(p.caVente):'-'}</td>
-      <td class="text-right">${p.commPct}%</td>
-      <td class="text-right" style="color:var(--ora)">${p.vendu>0?fmtEur(p.commission):'-'}</td>
       <td class="text-right bold" style="color:var(--vf)">${p.vendu>0?fmtEur(p.netProducteur):'-'}</td>
     </tr>`).join('');
 
@@ -2577,7 +2578,6 @@ function printReleve(supplier, dateDebut, dateFin) {
     <td style="text-align:right">${p.restant}</td>
     <td style="text-align:right">${fmtEur(p.products_price_ttc)}</td>
     <td style="text-align:right;font-weight:bold">${p.vendu>0?fmtEur(p.caVente):'-'}</td>
-    <td style="text-align:right;color:#E07020">${p.vendu>0?fmtEur(p.commission):'-'}</td>
     <td style="text-align:right;font-weight:bold;color:#4B6239">${p.vendu>0?fmtEur(p.netProducteur):'-'}</td>
   </tr>`).join('');
 
@@ -2601,7 +2601,7 @@ function printReleve(supplier, dateDebut, dateFin) {
   .sign-label{font-size:10px;color:#888}</style>
   </head><body>
   <h1>Relevé de ventes - Dépôt-vente</h1>
-  <div class="sub">Boutique Contrées Vertes<br>
+  <div class="sub">Boutique Contrées Vertes &nbsp;|&nbsp; 14 place Gambetta - 19000 Tulle | SIRET : 51966219100039<br>
   Période : du ${dateDebut} au ${dateFin} - Édité le ${today}</div>
   <div style="background:#f0ede3;padding:14px 16px;border-radius:8px;margin-bottom:20px">
     <div style="font-size:11px;color:#888;margin-bottom:2px">Producteur / Fournisseur</div>
@@ -2625,7 +2625,6 @@ function printReleve(supplier, dateDebut, dateFin) {
       <tr class="total-row">
         <td colspan="6">TOTAL</td>
         <td class="text-right">${fmtEur(totalCA)}</td>
-        <td class="text-right" style="color:#E07020">${fmtEur(totalComm)}</td>
         <td class="text-right" style="color:#4B6239">${fmtEur(totalNet)}</td>
       </tr>
     </tbody>
