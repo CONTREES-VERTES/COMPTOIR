@@ -1128,7 +1128,7 @@ async function fetchHiboutik(endpoint) {
 async function loadHiboutikData() {
   setSyncStatus('loading', 'Chargement...');
   try {
-    // Fetch all products pages (Hiboutik pagine par 250)
+    // Fetch all pages of an endpoint (Hiboutik pagine par 250)
     async function fetchAllPages(endpoint) {
       let all = [], page = 1;
       while (true) {
@@ -1140,6 +1140,27 @@ async function loadHiboutikData() {
         page++;
       }
       return all;
+    }
+
+    // Fetch stock for all warehouses and sum by product_id
+    async function fetchAllStockAllWarehouses() {
+      const warehouseIds = [1, 2, 3]; // Tulle, Gimel, Corrèze
+      const stockMap = {}, alertMap = {};
+      for (const wid of warehouseIds) {
+        try {
+          const rows = await fetchAllPages('/stock_available/warehouse_id/' + wid + '/');
+          rows.forEach(s => {
+            const id  = s.product_id;
+            const qty = parseInt(s.stock_available ?? 0);
+            stockMap[id] = (stockMap[id] || 0) + qty;
+            // inventory_alert : prendre le max des 3 entrepôts
+            if (s.inventory_alert !== undefined) {
+              alertMap[id] = Math.max(alertMap[id] || 0, parseInt(s.inventory_alert) || 0);
+            }
+          });
+        } catch(e) { console.warn('Warehouse ' + wid + ' failed:', e.message); }
+      }
+      return { stockMap, alertMap };
     }
 
     const [products, cats, sups] = await Promise.all([
