@@ -1185,32 +1185,19 @@ async function loadHiboutikData() {
 
     // Try multiple stock endpoints (Hiboutik uses warehouse-scoped stock)
     const stockMap = {}, alertMap = {};
-    let stockRaw = [], stockEndpointUsed = '';
-
-    // Try endpoints in order of likelihood
-    const stockEndpoints = [
-      '/stock_available/warehouse_id/1',
-      '/stock_available/warehouse_id/0',
-      '/stock_available/',
-      '/stock/',
-    ];
-    for (const ep of stockEndpoints) {
+    // Charger les stocks des 3 entrepôts : Tulle (1), Gimel (2), Corrèze (3)
+    for (const wid of [1, 2, 3]) {
       try {
-        stockRaw = await fetchHiboutik(ep);
-        if (Array.isArray(stockRaw) && stockRaw.length > 0) {
-          stockEndpointUsed = ep;
-                break;
-        }
-      } catch(e) { console.warn(`Stock endpoint ${ep} failed:`, e.message); }
+        const rows = await fetchAllPages('/stock_available/warehouse_id/' + wid + '/');
+        rows.forEach(s => {
+          const id  = s.product_id;
+          const qty = parseInt(s.stock_available ?? 0);
+          if (!isNaN(qty)) stockMap[id] = (stockMap[id] || 0) + qty;
+          if (s.inventory_alert !== undefined)
+            alertMap[id] = Math.max(alertMap[id] || 0, parseInt(s.inventory_alert) || 0);
+        });
+      } catch(e) { console.warn('Entrepôt ' + wid + ' failed:', e.message); }
     }
-
-    stockRaw.forEach(s => {
-      const id = s.product_id;
-      const qty = parseInt(s.stock_available ?? 0);
-      if (!isNaN(qty)) stockMap[id] = (stockMap[id] || 0) + qty;
-      // inventory_alert is also in this endpoint
-      if (s.inventory_alert !== undefined) alertMap[id] = parseInt(s.inventory_alert) || 0;
-    });
 
     // inventory_alert already loaded from /stock_available/warehouse_id/1 above
 
