@@ -2477,7 +2477,7 @@ function renderArretDV() {
     <div class="kpi-card br"><div class="kpi-label">Articles vendus</div><div class="kpi-value">${totalVendu}</div><div class="kpi-sub">unités écoulées</div></div>
     <div class="kpi-card tc"><div class="kpi-label">CA ventes TTC</div><div class="kpi-value" style="font-size:18px">${fmtEur(totalCA)}</div><div class="kpi-sub">chiffre d'affaires boutique</div></div>
     <div class="kpi-card vf"><div class="kpi-label">Net producteurs</div><div class="kpi-value" style="font-size:18px">${fmtEur(totalNet)}</div><div class="kpi-sub">à reverser / à facturer</div></div>
-    <div class="kpi-card orange"><div class="kpi-label">Commissions boutique</div><div class="kpi-value" style="font-size:18px">${fmtEur(totalComm)}</div><div class="kpi-sub">part boutique</div></div>
+    <div class="kpi-card orange"><div class="kpi-label">Part boutique</div><div class="kpi-value" style="font-size:18px">${fmtEur(totalComm)}</div><div class="kpi-sub">part boutique</div></div>
   `;
 
   // Grouper par producteur
@@ -2518,7 +2518,7 @@ function renderArretDV() {
           <div class="table-header-title">🤝 ${supplier}</div>
           <div style="font-size:11px;color:var(--txt2);margin-top:3px">
             ${prods.length} référence(s) - ${supVendu} unités vendues -
-            CA : ${fmtEur(supCA)} - Commission ${commPct}% : ${fmtEur(supComm)} -
+            CA : ${fmtEur(supCA)} -
             <strong style="color:var(--vf)">Net à reverser : ${fmtEur(supNet)}</strong>
           </div>
         </div>
@@ -2531,7 +2531,7 @@ function renderArretDV() {
           <th>Réf.</th><th>Article</th>
           <th class="text-right">Déposé</th><th class="text-right">Vendu</th><th class="text-right">Restant</th>
           <th class="text-right">PV TTC</th><th class="text-right">CA TTC</th>
-          <th class="text-right">Commission</th><th class="text-right">Comm. €</th><th class="text-right">Net producteur</th>
+          <th class="text-right">Net producteur</th>
         </tr></thead>
         <tbody>${rows}</tbody>
         <tfoot>
@@ -2611,14 +2611,14 @@ function printReleve(supplier, dateDebut, dateFin) {
   <div class="info-grid">
     <div class="info-box"><div class="info-label">Unités vendues</div><div class="info-value tc">${enriched.reduce((s,p)=>s+p.vendu,0)}</div></div>
     <div class="info-box"><div class="info-label">CA ventes TTC</div><div class="info-value tc">${fmtEur(totalCA)}</div></div>
-    <div class="info-box"><div class="info-label">Commission boutique (${commPct}%)</div><div class="info-value orange">${fmtEur(totalComm)}</div></div>
+    <div class="info-box"><div class="info-label">Part boutique retenue</div><div class="info-value orange">${fmtEur(totalComm)}</div></div>
     <div class="info-box"><div class="info-label">Net à reverser / à facturer</div><div class="info-value green">${fmtEur(totalNet)}</div></div>
   </div>
   <table>
     <thead><tr>
       <th>Réf.</th><th>Article</th><th class="text-right">Déposé</th><th class="text-right">Vendu</th>
       <th class="text-right">Restant</th><th class="text-right">PV TTC</th>
-      <th class="text-right">CA TTC</th><th class="text-right">Commission</th><th class="text-right">Net producteur</th>
+      <th class="text-right">CA TTC</th><th class="text-right">Net producteur</th>
     </tr></thead>
     <tbody>
       ${rows}
@@ -2656,9 +2656,9 @@ function exportArretCSV() {
   });
 
   const bom = '\uFEFF';
-  const header = 'Référence;Désignation;Producteur;Déposé;Vendu;Restant;PV TTC;CA TTC;Commission %;Commission €;Net producteur\n';
+  const header = 'Référence;Désignation;Producteur;Déposé;Vendu;Restant;PV TTC;CA TTC;Net producteur\n';
   const rows = enriched.map(p =>
-    `${p.products_id};${p.products_name};${p.suppliers_name||''};${p.depose};${p.vendu};${p.restant};${p.products_price_ttc.toFixed(2).replace('.',',')};${p.caVente.toFixed(2).replace('.',',')};${p.commPct};${p.commission.toFixed(2).replace('.',',')};${p.netProducteur.toFixed(2).replace('.',',')}`)
+    `${p.products_id};${p.products_name};${p.suppliers_name||''};${p.depose};${p.vendu};${p.restant};${p.products_price_ttc.toFixed(2).replace('.',',')};${p.caVente.toFixed(2).replace('.',',')};${p.netProducteur.toFixed(2).replace('.',',')}`)
     .join('\n');
 
   const blob = new Blob([bom + header + rows], {type:'text/csv;charset=utf-8'});
