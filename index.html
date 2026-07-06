@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Boutique Contrées Vertes - Gestion des stocks</title>
+<title>Boutique Contrées Vertes - Gestion des stocks v4</title>
 <style>
   :root {
     --tc:  #D88050;
@@ -999,15 +999,13 @@ function buildDemoData() {
 
 // ── HIBOUTIK API ──
 async function fetchHiboutik(endpoint) {
-  const base = `https://${APP.account}.hiboutik.com/api`;
-  const headers = {
-    'Authorization': 'Basic ' + btoa(`${APP.email}:${APP.apikey}`),
-    'Content-Type': 'application/json',
-    'Accept': 'application/json',
-  };
-  const res = await fetch(base + endpoint, { method: 'GET', headers, mode: 'cors' });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
+  // Proxy Apps Script - évite les erreurs CORS
+  const url = APPS_SCRIPT_URL + '?action=hiboutik&endpoint=' + encodeURIComponent(endpoint);
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('Proxy HTTP ' + res.status);
+  const data = await res.json();
+  if (data && data.error) throw new Error(data.error);
+  return data;
 }
 
 async function loadHiboutikData() {
