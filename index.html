@@ -1817,6 +1817,7 @@ async function loadCommandes() {
       if (data.commandes && Array.isArray(data.commandes)) {
         CMD.commandes = data.commandes;
         CMD.nextId = data.nextId || (Math.max(0, ...data.commandes.map(cc => cc.id)) + 1);
+        console.log(`${CMD.commandes.length} commande(s) restaurée(s) depuis le stockage local`);
       }
     } catch(e) {}
     return;
