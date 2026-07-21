@@ -117,7 +117,7 @@
   }
   .sidebar-sep { height: 1px; background: rgba(255,255,255,.1); margin: 8px 16px; }
 
-  /* ── MAIN ── */ 
+  /* ── MAIN ── */
   .main {
     flex: 1;
     overflow-y: auto;
@@ -1947,15 +1947,26 @@ async function saveCommandes(action, payload = {}) {
   } catch(e) { console.warn('Sync Google Sheet:', e.message); }
 }
 
-// POST fiable vers Apps Script (utilisé pour DV)
+// POST fiable vers Apps Script - GET pour petits payloads, POST pour les grands
 async function postToSheet(action, payload = {}) {
   if (!APPS_SCRIPT_URL) return { ok: false };
   try {
     const body = JSON.stringify({ action, ...payload });
-    // Utiliser GET avec données encodées - contourne le problème no-cors
-    const url = APPS_SCRIPT_URL + '?action=' + action + '&data=' + encodeURIComponent(body);
-    const res = await fetch(url);
-    return await res.json();
+    if (body.length <= 4000) {
+      // Petit payload : GET avec données encodées
+      const url = APPS_SCRIPT_URL + '?action=' + action + '&data=' + encodeURIComponent(body);
+      const res = await fetch(url);
+      return await res.json();
+    } else {
+      // Grand payload : POST no-cors (pas de retour mais ça fonctionne)
+      await fetch(APPS_SCRIPT_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body,
+      });
+      return { ok: true };
+    }
   } catch(e) {
     console.warn('postToSheet failed:', e.message);
     return { ok: false, error: e.message };
