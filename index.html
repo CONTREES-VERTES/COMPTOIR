@@ -1973,40 +1973,7 @@ async function postToSheet(action, payload = {}) {
   }
 }
 
-async function loadCommandes() {
-  if (!APPS_SCRIPT_URL) {
-    // Fallback localStorage si pas encore configuré
-    try {
-      const raw = localStorage.getItem('cv_boutique_commandes');
-      if (!raw) return;
-      const data = JSON.parse(raw);
-      if (data.commandes && Array.isArray(data.commandes)) {
-        CMD.commandes = data.commandes;
-        CMD.nextId = data.nextId || (Math.max(0, ...data.commandes.map(cc => cc.id)) + 1);
-        console.log(`${CMD.commandes.length} commande(s) restaurée(s) depuis le stockage local`);
-      }
-    } catch(e) {}
-    return;
-  }
-
-  setSyncIndicator(true, 'Chargement commandes...');
-  try {
-    const res  = await fetch(APPS_SCRIPT_URL + '?action=get', { mode: 'cors' });
-    const data = await res.json();
-    if (data.ok && Array.isArray(data.commandes)) {
-      CMD.commandes = data.commandes;
-      CMD.nextId    = data.nextId || 1;
-    }
-  } catch(e) {
-    console.warn('Impossible de charger depuis Google Sheet, fallback localStorage:', e);
-    try {
-      const raw = localStorage.getItem('cv_boutique_commandes');
-      if (raw) { const d = JSON.parse(raw); CMD.commandes = d.commandes||[]; CMD.nextId = d.nextId||1; }
-    } catch {}
-  } finally {
-    setSyncIndicator(false);
-  }
-}
+async 
 
 async function clearCommandes() {
   if (!confirm('Supprimer toutes les commandes ? Cette action est irréversible.')) return;
