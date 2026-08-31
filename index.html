@@ -2007,17 +2007,38 @@ function saveCommandes() {
   } catch(e) { console.warn('Sauvegarde commandes impossible:', e); }
 }
 
-function loadCommandes() {
+async function loadCommandes() {
+  // Toujours charger depuis le Google Sheet en priorité
+  if (APPS_SCRIPT_URL) {
+    try {
+      setSyncIndicator(true, 'Chargement commandes...');
+      const res  = await fetch(APPS_SCRIPT_URL + '?action=commandes');
+      const data = await res.json();
+      if (data.ok && Array.isArray(data.commandes)) {
+        CMD.commandes = data.commandes;
+        CMD.nextId    = data.nextId || 1;
+        console.log(data.commandes.length + ' commande(s) chargée(s) depuis Google Sheet');
+        localStorage.setItem('cv_boutique_commandes', JSON.stringify({ commandes: CMD.commandes, nextId: CMD.nextId }));
+        setSyncIndicator(false);
+        return;
+      }
+    } catch(e) {
+      console.warn('Google Sheet indisponible:', e.message);
+    } finally {
+      setSyncIndicator(false);
+    }
+  }
+  // Fallback localStorage
   try {
-    const raw = localStorage.getItem(CMD_STORAGE_KEY);
+    const raw = localStorage.getItem('cv_boutique_commandes');
     if (!raw) return;
     const data = JSON.parse(raw);
     if (data.commandes && Array.isArray(data.commandes)) {
       CMD.commandes = data.commandes;
-      CMD.nextId    = data.nextId || (Math.max(0, ...data.commandes.map(c => c.id)) + 1);
-      console.log(`${CMD.commandes.length} commande(s) restaurée(s) depuis le stockage local`);
+      CMD.nextId = data.nextId || (Math.max(0, ...data.commandes.map(cc => cc.id)) + 1);
+      console.log(CMD.commandes.length + ' commande(s) restaurée(s) depuis le stockage local');
     }
-  } catch(e) { console.warn('Chargement commandes impossible:', e); }
+  } catch(e) { console.warn('Chargement impossible:', e); }
 }
 
 function clearCommandes() {
