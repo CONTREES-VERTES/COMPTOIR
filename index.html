@@ -2000,11 +2000,16 @@ function showSyncConfig() {
 // ── PERSISTANCE LOCALE DES COMMANDES ─────────────────────────────────────────
 const CMD_STORAGE_KEY = 'cv_boutique_commandes';
 
-function saveCommandes() {
+function saveCommandes(action, payload = {}) {
+  // Sauvegarde locale
   try {
     const data = { commandes: CMD.commandes, nextId: CMD.nextId, savedAt: new Date().toISOString() };
     localStorage.setItem(CMD_STORAGE_KEY, JSON.stringify(data));
-  } catch(e) { console.warn('Sauvegarde commandes impossible:', e); }
+  } catch(e) { console.warn('Sauvegarde locale impossible:', e); }
+  // Sauvegarde Google Sheet si action spécifiée
+  if (action && APPS_SCRIPT_URL) {
+    postToSheet(action, payload).catch(e => console.warn('Sheet sync failed:', e.message));
+  }
 }
 
 async function loadCommandes() {
@@ -2216,7 +2221,6 @@ function validerCommande() {
   };
   CMD.commandes.unshift(newCmd);
   // Sauvegarde locale + Google Sheet
-  localStorage.setItem('cv_boutique_commandes', JSON.stringify({ commandes: CMD.commandes, nextId: CMD.nextId }));
   saveCommandes('create', { commande: newCmd });
   saveCommandes();
 
@@ -2402,7 +2406,6 @@ function marquerEnvoyee(id) {
   const cmd = CMD.commandes.find(c => c.id === id);
   if (cmd) {
     cmd.statut = 'Envoyée';
-    localStorage.setItem('cv_boutique_commandes', JSON.stringify({ commandes: CMD.commandes, nextId: CMD.nextId }));
     saveCommandes('update_statut', { id: cmd.id, statut: 'Envoyée' });
     renderSuivi();
   }
@@ -2454,7 +2457,6 @@ async function confirmerReception() {
   cmd.commentaire_reception = document.getElementById('rec-comment').value;
   cmd.date_reception        = new Date().toISOString().slice(0,10);
   cmd.statut = tousRecus ? 'Reçue' : (auMoinsUn ? 'Reçue partiellement' : 'En attente');
-  localStorage.setItem('cv_boutique_commandes', JSON.stringify({ commandes: CMD.commandes, nextId: CMD.nextId }));
   saveCommandes('update_reception', {
     id: cmd.id, statut: cmd.statut,
     date_reception: cmd.date_reception,
