@@ -2487,16 +2487,18 @@ async function confirmerReception() {
     progressList.appendChild(row);
 
     try {
-      // POST /stock_orders/ - create a stock arrival (arrivage) in Hiboutik
-      const payload = {
-        product_id:   a.product.products_id,
-        product_size: 0,
+      // Créer un arrivage dans Hiboutik via le proxy Apps Script
+      const res = await postToSheet('create_arrivage', {
+        supplier_id:  a.product.suppliers_id || 0,
         warehouse_id: 1,
-        quantity:     a.qty_recue,
-        stock_order_comment: `BC-${String(cmd.id).padStart(4,'0')} - ${cmd.sup}${cmd.commentaire_reception ? ' - ' + cmd.commentaire_reception : ''}`,
-      };
-
-      const res = await fetchHiboutikPOST('/stock_orders/', payload);
+        label: 'BC-' + String(cmd.id).padStart(4,'0') + ' - ' + cmd.sup,
+        articles: [{
+          product_id:    a.product.products_id,
+          product_size:  0,
+          quantity:      a.qty_recue,
+          product_price: a.product.products_price || '',
+        }]
+      });
       document.getElementById('row-status-' + a.product.products_id).innerHTML =
         `<span style="color:#27AE60;font-weight:bold">✅ +${a.qty_recue}</span>`;
       hiboutikOK++;
